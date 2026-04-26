@@ -8,19 +8,15 @@ use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\DistributionController;
 use App\Http\Controllers\Api\ComplementController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\TontineController; // ← NOUVEAU
 
 /*
 |--------------------------------------------------------------------------
 | API Routes — MaTontine  /api/v1
 |
 | ⚠️  RÈGLE CRITIQUE ANTI-404 :
-|     Les routes avec un SEGMENT FIXE (ex: "semaine", "encaisser",
-|     "abandonner", "marquer-paye"…) doivent toujours être déclarées
+|     Les routes avec un SEGMENT FIXE doivent toujours être déclarées
 |     AVANT les routes avec un paramètre dynamique {id}.
-|     Laravel évalue les routes dans l'ordre de déclaration : si
-|     Route::delete('cotisations/{id}') est déclaré avant
-|     Route::get('cotisations/semaine/{n}'), le mot "semaine" est
-|     capturé comme {id} → 404 ou ModelNotFoundException.
 |--------------------------------------------------------------------------
 */
 
@@ -46,8 +42,12 @@ Route::prefix('v1')->group(function () {
         Route::get('stats/sanctions',   [DashboardController::class, 'statsSanctions']);
         Route::get('stats/membres',     [DashboardController::class, 'statsMembres']);
 
+        // ── TONTINES ← NOUVEAU ────────────────────────────────────────────
+        // Segment fixe {tontine}/show avant apiResource
+        Route::get('tontines/{tontine}', [TontineController::class, 'show']);
+        Route::get('tontines',           [TontineController::class, 'index']);
+
         // ── MEMBRES ───────────────────────────────────────────────────────
-        // Segments fixes d'abord, apiResource ensuite
         Route::post('membres/{membre}/abandonner',  [MembreController::class,     'abandonner']);
         Route::post('membres/{membre}/reactiver',   [MembreController::class,     'reactiver']);
         Route::get ('membres/{membre}/historique',  [MembreController::class,     'historique']);
@@ -56,17 +56,12 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('membres', MembreController::class);
 
         // ── COTISATIONS ───────────────────────────────────────────────────
-    
-     Route::prefix('cotisations')->group(function () {
-
-    Route::post('encaisser', [CotisationController::class, 'encaisser']);
-
-    Route::get('semaine/{semaine?}', [CotisationController::class, 'semaine']);
-
-    Route::get('/', [CotisationController::class, 'index']);
-
-    Route::put('{cotisation}/annuler', [CotisationController::class, 'annuler']);  
-}); 
+        Route::prefix('cotisations')->group(function () {
+            Route::post('encaisser',            [CotisationController::class, 'encaisser']);
+            Route::get ('semaine/{semaine?}',   [CotisationController::class, 'semaine']);
+            Route::get ('/',                    [CotisationController::class, 'index']);
+            Route::put ('{cotisation}/annuler', [CotisationController::class, 'annuler']);
+        });
 
         // ── SANCTIONS ─────────────────────────────────────────────────────
         Route::post('sanctions/{sanction}/marquer-paye', [SanctionController::class, 'marquerPaye']);

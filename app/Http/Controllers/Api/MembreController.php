@@ -55,47 +55,44 @@ class MembreController extends Controller
     // 3. genererPourMembre() ne filtre plus sur is_active →
     //    le nouveau membre est toujours traité
     // ──────────────────────────────────────────────────────────
-    public function store(Request $request): JsonResponse
+   public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'nom'        => 'required|string|max:255',
             'telephone'  => 'required|string',
             'adresse'    => 'nullable|string',
             'profession' => 'required|string',
+            'tontine_id' => 'required|exists:tontines,id', // ← NOUVEAU
         ]);
 
-        // Valeurs explicites — ne jamais dépendre du default de la migration
         $data['num_registre']     = (Membre::withTrashed()->max('num_registre') ?? 0) + 1;
         $data['date_inscription'] = now()->toDateString();
-        $data['is_active']        = true;  // ← CORRECTION : explicite
-        $data['a_abandonne']      = false; // ← CORRECTION : explicite
+        $data['is_active']        = true;
+        $data['a_abandonne']      = false;
 
         $membre = Membre::create($data);
+        $membre->load('tontine'); // ← précharger pour formatMembre
 
-        // Génère toutes les semaines passées (1 → semaine courante) en 'impaye'
-        // DOIT être appelé après create() pour que le membre existe en DB
         $this->cotisationService->genererPourMembre($membre->id);
 
-        // fresh() recharge depuis la DB avec les accessors recalculés
-        return response()->json($this->formatMembre($membre->fresh()), 201);
+        return response()->json($this->formatMembre($membre->fresh()->load('tontine')), 201);
     }
 
     // ──────────────────────────────────────────────────────────
     // GET /membres/{membre}
     // ──────────────────────────────────────────────────────────
-    public function show(Membre $membre): JsonResponse
+ public function show(Membre $membre): JsonResponse
     {
-        // Génère les semaines manquantes avant lecture du profil
         $this->cotisationService->genererPourMembre($membre->id);
 
         $membre->load([
+            'tontine',   // ← NOUVEAU
             'cotisations'   => fn($q) => $q->where('annee', now()->year)->orderBy('num_semaine', 'desc'),
             'sanctions'     => fn($q) => $q->orderBy('date_sanction', 'desc'),
             'distributions' => fn($q) => $q->orderBy('date_distribution', 'desc'),
             'complements',
         ]);
 
-        // Toutes les cotisations (payées ET impayées) pour Flutter
         $cotisations = $membre->cotisations->map(fn($c) => [
             'id'          => $c->id,
             'num_semaine' => (int) $c->num_semaine,
@@ -261,8 +258,8 @@ class MembreController extends Controller
             'date_generation' => now()->format('d/m/Y à H:i'),
         ]);
 
-        $filename = "membre_{$membre->num_registre}_{$membre->nom}_" . now()->format('dmY') . ".pdf";
-        return $pdf->download($filename);
+       $filename = "membre-{$membre->num_registre}-{$membre->nom}-" . now()->format('dmY') . ".pdf";
+       return $pdf->download($filename);
     }
 
     // ──────────────────────────────────────────────────────────
@@ -286,6 +283,16 @@ class MembreController extends Controller
             'total_cotise_cfa'       => $m->total_cotise_cfa,
             'est_eligible_moto'      => $m->est_eligible_moto,
             'perd_argent_si_abandon' => $m->perd_argent_si_abandon,
+
+            // ── NOUVEAU : infos tontine ────────────────────
+            'montant_cotisation'     => $m->montant_cotisation,
+            'tontine_id'             => $m->tontine_id,
+            'tontine' => $m->tontine ? [
+                'id'        => $m->tontine->id,
+                'nom'       => $m->tontine->nom,
+                'categorie' => $m->tontine->categorie,
+                'montant'   => $m->tontine->montant,
+            ] : null,
         ];
     }
 }

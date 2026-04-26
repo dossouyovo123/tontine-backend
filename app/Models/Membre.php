@@ -1,13 +1,11 @@
 <?php
-
-// ──────────────────────────────────────────────────────────────
 // app/Models/Membre.php
-// ──────────────────────────────────────────────────────────────
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Membre extends Model
 {
@@ -16,6 +14,7 @@ class Membre extends Model
     protected $fillable = [
         'num_registre', 'nom', 'telephone', 'adresse',
         'profession', 'is_active', 'a_abandonne', 'date_inscription',
+        'tontine_id', // ← NOUVEAU
     ];
 
     protected $casts = [
@@ -24,19 +23,15 @@ class Membre extends Model
         'date_inscription' => 'date',
     ];
 
-    /**
-     * Ces attributs sont toujours inclus dans la sérialisation JSON.
-     * Flutter peut ainsi accéder directement à ces valeurs calculées
-     * sans appel supplémentaire.
-     */
     protected $appends = [
         'semaines_cotisees',
         'total_cotise_cfa',
         'est_eligible_moto',
         'perd_argent_si_abandon',
+        'montant_cotisation', // ← NOUVEAU
     ];
 
-    // ── Relations ─────────────────────────────────────────────
+    // ── Relations ─────────────────────────────────────────
     public function cotisations(): HasMany
     {
         return $this->hasMany(Cotisation::class);
@@ -57,12 +52,23 @@ class Membre extends Model
         return $this->hasMany(Complement::class);
     }
 
-    // ── Accessors calculés ────────────────────────────────────
+    /** ← NOUVEAU : tontine du membre */
+    public function tontine(): BelongsTo
+    {
+        return $this->belongsTo(Tontine::class);
+    }
+
+    // ── Accessors ─────────────────────────────────────────
 
     /**
-     * Nombre de semaines PAYÉES pour l'année courante uniquement.
-     * Utilisé dans Flutter pour la progression annuelle et l'éligibilité moto.
+     * ← NOUVEAU : montant hebdomadaire propre à ce membre.
+     * Fallback vers MONTANT_HEBDO si pas de tontine assignée.
      */
+    public function getMontantCotisationAttribute(): int
+    {
+        return $this->tontine?->montant ?? \App\Services\TontineCalcService::MONTANT_HEBDO;
+    }
+
     public function getSemainesCotiseesAttribute(): int
     {
         return $this->cotisations()
@@ -72,8 +78,8 @@ class Membre extends Model
     }
 
     /**
-     * Total CFA versé (toutes années confondues, semaines payées uniquement).
-     * Sert au calcul de la règle abandon (< 50 000 CFA → perd son argent).
+     * Somme réelle des montants encaissés (toutes années).
+     * Utilise le montant DB — correct même si le membre a changé de tontine.
      */
     public function getTotalCotiseCfaAttribute(): int
     {
@@ -82,35 +88,22 @@ class Membre extends Model
             ->sum('montant');
     }
 
-    /**
-     * Éligible au complément moto si ≥ 12 semaines payées (année courante).
-     */
     public function getEstEligibleMotoAttribute(): bool
     {
         return $this->semainesCotisees >= \App\Services\TontineCalcService::SEUIL_ELIGIBILITE;
     }
 
-    /**
-     * Perd son argent en cas d'abandon si total cotisé < 50 000 CFA.
-     */
     public function getPerdArgentSiAbandonAttribute(): bool
     {
         return $this->totalCotiseCfa < \App\Services\TontineCalcService::SEUIL_ABANDON;
     }
 
-    /**
-     * Label lisible du statut : ACTIF / INACTIF / ABANDONNÉ.
-     */
     public function getStatutLabelAttribute(): string
     {
         if ($this->a_abandonne) return 'ABANDONNÉ';
         return $this->is_active ? 'ACTIF' : 'INACTIF';
     }
 
-    /**
-     * Vérifie si le membre a payé une semaine précise.
-     * N'utilise pas les semaines auto-générées (impayé) — vérifie seulement le statut 'paye'.
-     */
     public function aPayeSemaine(int $semaine, int $annee = null): bool
     {
         return $this->cotisations()
@@ -120,7 +113,7 @@ class Membre extends Model
             ->exists();
     }
 
-    // ── Scopes ────────────────────────────────────────────────
+    // ── Scopes ────────────────────────────────────────────
     public function scopeActifs($q)
     {
         return $q->where('is_active', true)->where('a_abandonne', false);

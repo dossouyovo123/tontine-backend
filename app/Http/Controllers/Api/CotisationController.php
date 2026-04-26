@@ -93,51 +93,52 @@ class CotisationController extends Controller
     // - La ligne n'existe pas encore → updateOrCreate la crée en 'paye'
     // - Contrainte unique (membre_id, num_semaine, annee) → jamais de doublon
     // ──────────────────────────────────────────────────────────
-    public function encaisser(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'membre_id'   => 'required|exists:membres,id',
-            'num_semaine' => 'required|integer|between:1,52',
-            'annee'       => 'sometimes|integer|min:2020|max:2100',
-        ]);
+ public function encaisser(Request $request): JsonResponse
+{
+    $data = $request->validate([
+        'membre_id'   => 'required|exists:membres,id',
+        'num_semaine' => 'required|integer|between:1,52',
+        'annee'       => 'sometimes|integer|min:2020|max:2100',
+    ]);
 
-        $annee      = (int) ($data['annee'] ?? now()->year);
-        $dateSamedi = $this->calc->dateSamedi($data['num_semaine'], $annee)->toDateString();
+    $annee      = (int) ($data['annee'] ?? now()->year);
+    $dateSamedi = $this->calc->dateSamedi($data['num_semaine'], $annee)->toDateString();
 
-        $cotisation = Cotisation::updateOrCreate(
-            [
-                // Clé de recherche unique — trouve la ligne existante quelle que soit son statut
-                'membre_id'   => $data['membre_id'],
-                'num_semaine' => $data['num_semaine'],
-                'annee'       => $annee,
-            ],
-            [
-                // Valeurs à appliquer (création ou mise à jour)
-                'date_samedi' => $dateSamedi,
-                'montant'     => TontineCalcService::MONTANT_HEBDO,
-                'statut'      => 'paye',
-            ]
-        );
+    // ← NOUVEAU : montant propre au membre via sa tontine
+    $membre  = Membre::with('tontine')->findOrFail($data['membre_id']);
+    $montant = $membre->montant_cotisation; // utilise l'accessor Membre
 
-        $membre = Membre::find($data['membre_id']);
+    $cotisation = Cotisation::updateOrCreate(
+        [
+            'membre_id'   => $data['membre_id'],
+            'num_semaine' => $data['num_semaine'],
+            'annee'       => $annee,
+        ],
+        [
+            'date_samedi' => $dateSamedi,
+            'montant'     => $montant,    // ← montant dynamique
+            'statut'      => 'paye',
+        ]
+    );
 
-        return response()->json([
-            'id'          => $cotisation->id,
-            'num_semaine' => $cotisation->num_semaine,
-            'annee'       => $cotisation->annee,
-            'date_samedi' => $cotisation->date_samedi->format('d/m/Y'),
-            'montant'     => $cotisation->montant,
-            'statut'      => $cotisation->statut,
-            'paye'        => true,
-            'membre'      => [
-                'id'               => $membre->id,
-                'nom'              => $membre->nom,
-                'semaines_cotisees'=> $membre->semaines_cotisees,   // recalculé depuis la DB
-                'total_cotise_cfa' => $membre->total_cotise_cfa,
-                'est_eligible_moto'=> $membre->est_eligible_moto,
-            ],
-        ], 201);
-    }
+    return response()->json([
+        'id'          => $cotisation->id,
+        'num_semaine' => $cotisation->num_semaine,
+        'annee'       => $cotisation->annee,
+        'date_samedi' => $cotisation->date_samedi->format('d/m/Y'),
+        'montant'     => $cotisation->montant,
+        'statut'      => $cotisation->statut,
+        'paye'        => true,
+        'membre'      => [
+            'id'                 => $membre->id,
+            'nom'                => $membre->nom,
+            'semaines_cotisees'  => $membre->semaines_cotisees,
+            'total_cotise_cfa'   => $membre->total_cotise_cfa,
+            'est_eligible_moto'  => $membre->est_eligible_moto,
+            'montant_cotisation' => $montant,
+        ],
+    ], 201);
+}
 
     // ──────────────────────────────────────────────────────────
     // PUT /cotisations/{cotisation}/annuler

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code OTP — MaTontine</title>
+    <title>Code OTP — J-Solution</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; margin: 0; padding: 0; }
         .container { max-width: 520px; margin: 40px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
@@ -24,7 +24,7 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>🔐 MaTontine</h1>
+        <h1>🔐 J-Solution</h1>
         <p>Réinitialisation de mot de passe</p>
     </div>
     <div class="body">
@@ -43,7 +43,7 @@
         <p class="info">Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email. Votre compte reste sécurisé.</p>
     </div>
     <div class="footer">
-        <p>© {{ date('Y') }} MaTontine — Système de gestion de tontine</p>
+        <p>© {{ date('Y') }} J-Solution — Système de gestion de tontine</p>
     </div>
 </div>
 </body>

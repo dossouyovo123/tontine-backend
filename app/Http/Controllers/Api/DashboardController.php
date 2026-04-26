@@ -32,8 +32,11 @@ class DashboardController extends Controller
         $nbRetard = max(0, $totalActifs - $nbPayes);
 
         // Montant collecté cette semaine
-        $collecte = $nbPayes * TontineCalcService::MONTANT_HEBDO;
-
+$collecte = (int) Cotisation::where('num_semaine', $semaine)
+                             ->where('annee', $annee)
+                             ->where('statut', 'paye')
+                             ->sum('montant');
+                             
         // ── Sanctions décomposées ─────────────────────────────────
         $sanctTotal     = (int) Sanction::sum('montant');
         $sanctEncaisse  = (int) Sanction::where('statut', 'paye')->sum('montant');
