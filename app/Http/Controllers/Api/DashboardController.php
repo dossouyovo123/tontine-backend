@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Membre, Cotisation, Sanction, Distribution, Complement};
+use App\Models\{Membre, Cotisation, Sanction, Distribution, Complement,Benefice, Depense};
 use App\Services\TontineCalcService;
 use Illuminate\Http\JsonResponse;
 
@@ -41,7 +41,8 @@ $collecte = (int) Cotisation::where('num_semaine', $semaine)
         $sanctTotal     = (int) Sanction::sum('montant');
         $sanctEncaisse  = (int) Sanction::where('statut', 'paye')->sum('montant');
         $sanctEnAttente = $sanctTotal - $sanctEncaisse; // plus fiable que != 'paye'
-
+        $totalBenefices = (int) Benefice::where('annee', $annee)->sum('montant_benefice');
+        $totalDepenses  = (int) Depense::sum('montant');
         return response()->json([
             'semaine_courante' => $semaine,
             'date_samedi'      => $dateSamedi,
@@ -75,8 +76,18 @@ $collecte = (int) Cotisation::where('num_semaine', $semaine)
                 'en_attente'    => (int) Complement::where('statut', 'en_attente')->count(),
                 'approuves'     => (int) Complement::where('statut', 'approuve')->count(),
                 'moto_attribuee'=> (int) Complement::where('statut', 'moto_attribuee')->count(),
-            ],
-        ]);
+           
+                ],
+                'benefices' => [
+                 'total'      => $totalBenefices,
+               'nb_membres' => (int) Benefice::where('annee', $annee)->count(),
+                 ],
+            'depenses' => [
+            'total'      => $totalDepenses,
+           'nb_depenses'=> (int) Depense::count(),
+                ],
+        
+                ]);
     }
 
     public function statsCotisations(): JsonResponse

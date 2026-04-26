@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DistributionController;
 use App\Http\Controllers\Api\ComplementController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\TontineController; // ← NOUVEAU
+use App\Http\Controllers\Api\{BeneficeController, DepenseController};
 
 /*
 |--------------------------------------------------------------------------
@@ -78,5 +79,17 @@ Route::prefix('v1')->group(function () {
         Route::post('complements/{complement}/attribuer', [ComplementController::class, 'attribuerMoto']);
         Route::get ('complements/{complement}/pdf',       [ComplementController::class, 'exportPdf']);
         Route::apiResource('complements', ComplementController::class)->except(['update']);
+
+        // ── BÉNÉFICES ─────────────────────────────────────────────────
+// Segment fixe 'calculer' et 'stats' AVANT {benefice}
+Route::post('benefices/calculer',    [BeneficeController::class, 'calculer']);
+Route::get ('benefices/stats',       [BeneficeController::class, 'stats']);
+Route::get ('benefices',             [BeneficeController::class, 'index']);
+Route::delete('benefices/{benefice}',[BeneficeController::class, 'destroy']);
+
+// ── DÉPENSES ──────────────────────────────────────────────────
+// POST pour update (multipart/form-data + image)
+Route::post('depenses/{depense}/update', [DepenseController::class, 'update']);
+Route::apiResource('depenses', DepenseController::class)->except(['update']);
     });
 });
