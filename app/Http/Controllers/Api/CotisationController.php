@@ -93,7 +93,7 @@ class CotisationController extends Controller
     // - La ligne n'existe pas encore → updateOrCreate la crée en 'paye'
     // - Contrainte unique (membre_id, num_semaine, annee) → jamais de doublon
     // ──────────────────────────────────────────────────────────
- public function encaisser(Request $request): JsonResponse
+public function encaisser(Request $request): JsonResponse
 {
     $data = $request->validate([
         'membre_id'   => 'required|exists:membres,id',
@@ -104,9 +104,8 @@ class CotisationController extends Controller
     $annee      = (int) ($data['annee'] ?? now()->year);
     $dateSamedi = $this->calc->dateSamedi($data['num_semaine'], $annee)->toDateString();
 
-    // ← NOUVEAU : montant propre au membre via sa tontine
     $membre  = Membre::with('tontine')->findOrFail($data['membre_id']);
-    $montant = $membre->montant_cotisation; // utilise l'accessor Membre
+    $montant = $membre->montant_cotisation;
 
     $cotisation = Cotisation::updateOrCreate(
         [
@@ -116,20 +115,22 @@ class CotisationController extends Controller
         ],
         [
             'date_samedi' => $dateSamedi,
-            'montant'     => $montant,    // ← montant dynamique
+            'montant'     => $montant,
             'statut'      => 'paye',
         ]
     );
 
+    
+
     return response()->json([
-        'id'          => $cotisation->id,
-        'num_semaine' => $cotisation->num_semaine,
-        'annee'       => $cotisation->annee,
-        'date_samedi' => $cotisation->date_samedi->format('d/m/Y'),
-        'montant'     => $cotisation->montant,
-        'statut'      => $cotisation->statut,
-        'paye'        => true,
-        'membre'      => [
+        'id'              => $cotisation->id,
+        'num_semaine'     => $cotisation->num_semaine,
+        'annee'           => $cotisation->annee,
+        'date_samedi'     => $cotisation->date_samedi->format('d/m/Y'),
+        'montant'         => $cotisation->montant,
+        'statut'          => $cotisation->statut,
+        'paye'            => true,
+        'membre'          => [
             'id'                 => $membre->id,
             'nom'                => $membre->nom,
             'semaines_cotisees'  => $membre->semaines_cotisees,
@@ -139,7 +140,6 @@ class CotisationController extends Controller
         ],
     ], 201);
 }
-
     // ──────────────────────────────────────────────────────────
     // PUT /cotisations/{cotisation}/annuler
     // Annule un encaissement → statut 'impaye', montant 0

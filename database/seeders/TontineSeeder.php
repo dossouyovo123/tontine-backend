@@ -15,14 +15,19 @@ class TontineSeeder extends Seeder
             ['nom' => 'Tontine 5 000 F',  'categorie' => 'petits',  'montant' => 5000],
             ['nom' => 'Tontine 6 000 F', 'categorie' => 'petits', 'montant' => 6000],
             ['nom' => 'Tontine 7 000 F', 'categorie' => 'petits', 'montant' => 7000],
+             ['nom' => 'Tontine 7 500 F', 'categorie' => 'petits', 'montant' => 7500],
+
 
             // ── Moyens montants ───────────────────────────────
             ['nom' => 'Tontine 10 000 F', 'categorie' => 'moyens',  'montant' => 10000],
             ['nom' => 'Tontine 10 500 F', 'categorie' => 'moyens',  'montant' => 10500,
-             'description' => 'Montant différent de 10 000 F — vérifiez bien'],
-            ['nom' => 'Tontine 15 000 F', 'categorie' => 'moyens',  'montant' => 15000],
+                         'description' => 'Montant différent de 10 000 F — vérifiez bien'],
+             ['nom' => 'Tontine 12 000 F', 'categorie' => 'moyens',  'montant' => 12000],
+           ['nom' => 'Tontine 14 000 F', 'categorie' => 'moyens',  'montant' => 14000],
+           ['nom' => 'Tontine 15 000 F', 'categorie' => 'moyens',  'montant' => 15000],
 
             // ── Grands montants ────────────────────────────────
+            ['nom' => 'Tontine 20 000 F', 'categorie' => 'grands',  'montant' => 20000],
             ['nom' => 'Tontine 21 000 F', 'categorie' => 'grands',  'montant' => 21000],
             ['nom' => 'Tontine 25 000 F', 'categorie' => 'grands',  'montant' => 25000],
             ['nom' => 'Tontine 30 000 F', 'categorie' => 'grands',  'montant' => 30000],

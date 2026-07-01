@@ -20,10 +20,11 @@ class Sanction extends Model
  
     protected $fillable = [
         'membre_id', 'motif', 'montant',
-        'date_sanction', 'statut', 'date_paiement', 'notes',
+        'date_sanction', 'statut', 'date_paiement', 'notes', 'auto_genere',
     ];
  
     protected $casts = [
+        'auto_genere'   => 'boolean',
         'date_sanction'  => 'date',
         'date_paiement'  => 'date',
     ];

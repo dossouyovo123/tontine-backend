@@ -37,7 +37,8 @@ class MembreController extends Controller
             );
         }
 
-        $paginated = $query->orderBy('num_registre')->paginate(20);
+        $perPage   = min((int) ($request->per_page ?? 200), 500); // max 500
+        $paginated = $query->orderBy('num_registre')->paginate($perPage);
         $paginated->getCollection()->transform(fn($m) => $this->formatMembre($m));
 
         return response()->json($paginated);
@@ -55,28 +56,38 @@ class MembreController extends Controller
     // 3. genererPourMembre() ne filtre plus sur is_active →
     //    le nouveau membre est toujours traité
     // ──────────────────────────────────────────────────────────
-   public function store(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'nom'        => 'required|string|max:255',
-            'telephone'  => 'required|string',
-            'adresse'    => 'nullable|string',
-            'profession' => 'required|string',
-            'tontine_id' => 'required|exists:tontines,id', // ← NOUVEAU
-        ]);
+ public function store(Request $request): JsonResponse
+{
+    $data = $request->validate([
+        'nom'        => 'required|string|max:255',
+        'telephone'  => 'required|string',
+        'adresse'    => 'nullable|string',
+        'profession' => 'required|string',
+        'tontine_id' => 'required|exists:tontines,id',
+    ]);
 
-        $data['num_registre']     = (Membre::withTrashed()->max('num_registre') ?? 0) + 1;
-        $data['date_inscription'] = now()->toDateString();
-        $data['is_active']        = true;
-        $data['a_abandonne']      = false;
+    // ── Vérification doublon par nom (insensible à la casse) ──
+    $existe = Membre::whereRaw('LOWER(nom) = ?', [strtolower($data['nom'])])->exists();
 
-        $membre = Membre::create($data);
-        $membre->load('tontine'); // ← précharger pour formatMembre
-
-        $this->cotisationService->genererPourMembre($membre->id);
-
-        return response()->json($this->formatMembre($membre->fresh()->load('tontine')), 201);
+    if ($existe) {
+        return response()->json([
+            'message' => 'Un membre avec ce nom existe déjà.',
+            'errors'  => ['nom' => ['Ce nom est déjà enregistré.']],
+        ], 422);
     }
+
+    $data['num_registre']     = (Membre::withTrashed()->max('num_registre') ?? 0) + 1;
+    $data['date_inscription'] = now()->toDateString();
+    $data['is_active']        = true;
+    $data['a_abandonne']      = false;
+
+    $membre = Membre::create($data);
+    $membre->load('tontine');
+
+    $this->cotisationService->genererPourMembre($membre->id);
+
+    return response()->json($this->formatMembre($membre->fresh()->load('tontine')), 201);
+}
 
     // ──────────────────────────────────────────────────────────
     // GET /membres/{membre}
@@ -138,19 +149,25 @@ class MembreController extends Controller
     // ──────────────────────────────────────────────────────────
     // PUT /membres/{membre}
     // ──────────────────────────────────────────────────────────
-    public function update(Request $request, Membre $membre): JsonResponse
-    {
-        $data = $request->validate([
-            'nom'        => 'sometimes|string|max:255',
-            'telephone'  => 'sometimes|string',
-            'adresse'    => 'nullable|string',
-            'profession' => 'sometimes|string',
-            'is_active'  => 'sometimes|boolean',
-        ]);
+  // ── PUT /membres/{membre} — MODIFIÉ ──────────────────────────
+public function update(Request $request, Membre $membre): JsonResponse
+{
+    $data = $request->validate([
+        'nom'        => 'sometimes|string|max:255',
+        'telephone'  => 'sometimes|string',
+        'adresse'    => 'nullable|string',
+        'profession' => 'sometimes|string',
+        'is_active'  => 'sometimes|boolean',
+        'tontine_id' => 'sometimes|exists:tontines,id', // ← AJOUT
+    ]);
 
-        $membre->update($data);
-        return response()->json($this->formatMembre($membre->fresh()));
-    }
+    $membre->update($data);
+
+    // Recharge la tontine si elle a changé
+    $membre->fresh()->load('tontine');
+
+    return response()->json($this->formatMembre($membre->fresh()->load('tontine')));
+}
 
     // ──────────────────────────────────────────────────────────
     // DELETE /membres/{membre}
@@ -265,34 +282,39 @@ class MembreController extends Controller
     // ──────────────────────────────────────────────────────────
     // Helper : format uniforme pour Flutter (dates en dd/MM/yyyy)
     // ──────────────────────────────────────────────────────────
-    private function formatMembre(Membre $m): array
-    {
-        return [
-            'id'                     => $m->id,
-            'num_registre'           => $m->num_registre,
-            'nom'                    => $m->nom,
-            'telephone'              => $m->telephone ?? '',
-            'adresse'                => $m->adresse   ?? '',
-            'profession'             => $m->profession ?? '',
-            'is_active'              => (bool) $m->is_active,
-            'a_abandonne'            => (bool) $m->a_abandonne,
-            'date_inscription'       => $m->date_inscription
-                ? Carbon::parse($m->date_inscription)->format('d/m/Y')
-                : '',
-            'semaines_cotisees'      => $m->semaines_cotisees,
-            'total_cotise_cfa'       => $m->total_cotise_cfa,
-            'est_eligible_moto'      => $m->est_eligible_moto,
-            'perd_argent_si_abandon' => $m->perd_argent_si_abandon,
-
-            // ── NOUVEAU : infos tontine ────────────────────
-            'montant_cotisation'     => $m->montant_cotisation,
-            'tontine_id'             => $m->tontine_id,
-            'tontine' => $m->tontine ? [
-                'id'        => $m->tontine->id,
-                'nom'       => $m->tontine->nom,
-                'categorie' => $m->tontine->categorie,
-                'montant'   => $m->tontine->montant,
-            ] : null,
-        ];
-    }
+  private function formatMembre(Membre $m): array
+{
+    return [
+        'id'                          => $m->id,
+        'num_registre'                => $m->num_registre,
+        'nom'                         => $m->nom,
+        'telephone'                   => $m->telephone ?? '',
+        'adresse'                     => $m->adresse   ?? '',
+        'profession'                  => $m->profession ?? '',
+        'is_active'                   => (bool) $m->is_active,
+        'a_abandonne'                 => (bool) $m->a_abandonne,
+        'date_inscription'            => $m->date_inscription
+            ? Carbon::parse($m->date_inscription)->format('d/m/Y')
+            : '',
+        'semaines_cotisees'           => $m->semaines_cotisees,
+        'total_cotise_cfa'            => $m->total_cotise_cfa,
+        // ── AJOUT CRITIQUE — sans ça Flutter calcule duVersTontine = 0 ──
+        'total_distributions_recues'  => $m->total_distributions_recues,
+        // ── Calculs pré-faits (redondants mais utiles au frontend) ────────
+        'du_vers_tontine'             => $m->du_vers_tontine,
+        'credit_vers_membre'          => $m->credit_vers_membre,
+        'solde_net'                   => $m->solde_net,
+        // ─────────────────────────────────────────────────────────────────
+        'est_eligible_moto'           => $m->est_eligible_moto,
+        'perd_argent_si_abandon'      => $m->perd_argent_si_abandon,
+        'montant_cotisation'          => $m->montant_cotisation,
+        'tontine_id'                  => $m->tontine_id,
+        'tontine' => $m->tontine ? [
+            'id'        => $m->tontine->id,
+            'nom'       => $m->tontine->nom,
+            'categorie' => $m->tontine->categorie,
+            'montant'   => $m->tontine->montant,
+        ] : null,
+    ];
+}
 }

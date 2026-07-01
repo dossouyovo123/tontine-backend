@@ -28,7 +28,7 @@ class AuthController extends Controller
 
         if (! $admin || ! Hash::check($request->password, $admin->password)) {
             throw ValidationException::withMessages([
-                'email' => ['Identifiants incorrects.'],
+                'email' => ['Identifiants ou mot de passe  incorrect.'],
             ]);
         }
 
@@ -186,8 +186,8 @@ class AuthController extends Controller
             return response()->json(['message' => 'Session expirée. Recommencez depuis le début.'], 422);
         }
 
-        // Vérifie expiration (30 min)
-        if (Carbon::parse($record->created_at)->addMinutes(30)->isPast()) {
+        // Vérifie expiration (60 min)
+        if (Carbon::parse($record->created_at)->addMinutes(60)->isPast()) {
             DB::table('password_reset_tokens')->where('email', $request->email)->delete();
             return response()->json(['message' => 'Session expirée. Recommencez depuis le début.'], 422);
         }

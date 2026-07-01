@@ -15,11 +15,10 @@ class Depense extends Model
         'montant'      => 'integer',
     ];
 
-    /** URL publique de l'image (null si pas d'image) */
-    public function getImageUrlAttribute(): ?string
-    {
-        return $this->image_path
-            ? asset('storage/' . $this->image_path)
-            : null;
-    }
+ public function getImageUrlAttribute(): ?string
+{
+    return $this->image_path
+        ? url('api/v1/storage/' . $this->image_path)
+        : null;
+}
 }

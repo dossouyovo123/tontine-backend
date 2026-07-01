@@ -23,19 +23,23 @@ class DashboardController extends Controller
         $totalActifs = (int) Membre::actifs()->count();
 
         // Nombre de membres qui ont DÉJÀ payé cette semaine
-        $nbPayes = (int) Cotisation::where('num_semaine', $semaine)
-                                   ->where('annee', $annee)
-                                   ->where('statut', 'paye')
+         $nbPayes = (int) Cotisation::where('cotisations.num_semaine', $semaine)
+                                   ->where('cotisations.annee', $annee)
+                                   ->where('cotisations.statut', 'paye')
+                                   ->join('membres', 'membres.id', '=', 'cotisations.membre_id')
+                                   ->whereNull('membres.deleted_at')
                                    ->count();
 
         // Membres actifs qui N'ONT PAS encore payé → jamais négatif
         $nbRetard = max(0, $totalActifs - $nbPayes);
 
         // Montant collecté cette semaine
-$collecte = (int) Cotisation::where('num_semaine', $semaine)
-                             ->where('annee', $annee)
-                             ->where('statut', 'paye')
-                             ->sum('montant');
+$collecte = (int) Cotisation::where('cotisations.num_semaine', $semaine)
+                             ->where('cotisations.annee', $annee)
+                             ->where('cotisations.statut', 'paye')
+                             ->join('membres', 'membres.id', '=', 'cotisations.membre_id')
+                             ->whereNull('membres.deleted_at') // ← exclut les soft-deleted
+                             ->sum('cotisations.montant');
                              
         // ── Sanctions décomposées ─────────────────────────────────
         $sanctTotal     = (int) Sanction::sum('montant');
@@ -64,13 +68,19 @@ $collecte = (int) Cotisation::where('num_semaine', $semaine)
                 'collecte' => $collecte,   // int
             ],
 
-            'totaux' => [
-                'cotisations'          => (int) Cotisation::sum('montant'),
-                'distributions'        => (int) Distribution::sum('montant'),
-                'sanctions'            => $sanctTotal,
-                'sanctions_encaisse'   => $sanctEncaisse,
-                'sanctions_en_attente' => $sanctEnAttente,
-            ],
+        'totaux' => [
+    // ← CORRIGÉ : exclut les membres supprimés
+    'cotisations' => (int) Cotisation::join('membres', 'membres.id', '=', 'cotisations.membre_id')
+                                      ->whereNull('membres.deleted_at')
+                                      ->sum('cotisations.montant'),
+
+    // Distributions — pas de soft-delete sur les distributions
+    'distributions' => (int) Distribution::sum('montant'),
+
+    'sanctions'            => $sanctTotal,
+    'sanctions_encaisse'   => $sanctEncaisse,
+    'sanctions_en_attente' => $sanctEnAttente,
+],
 
             'complements' => [
                 'en_attente'    => (int) Complement::where('statut', 'en_attente')->count(),

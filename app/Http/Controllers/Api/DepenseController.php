@@ -126,8 +126,9 @@ class DepenseController extends Controller
                 ? Carbon::parse($d->date_depense)->format('d/m/Y')
                 : '',
             'notes'        => $d->notes,
-            'image_url'    => $d->image_url, // null si pas d'image
-            'has_image'    => !is_null($d->image_path),
+'image_url' => $d->image_path
+    ? url('api/v1/storage/' . $d->image_path)
+    : null,            'has_image'    => !is_null($d->image_path),
         ];
     }
 }

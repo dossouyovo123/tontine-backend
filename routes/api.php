@@ -28,6 +28,8 @@ Route::prefix('v1')->group(function () {
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('verify-otp',      [AuthController::class, 'verifyOtp']);
     Route::post('reset-password',  [AuthController::class, 'resetPassword']);
+    Route::get('storage/{path}', [\App\Http\Controllers\Api\StorageController::class, 'serve'])
+     ->where('path', '.*');
 
     // ── ROUTES PROTÉGÉES ──────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {
@@ -65,14 +67,32 @@ Route::prefix('v1')->group(function () {
         });
 
         // ── SANCTIONS ─────────────────────────────────────────────────────
+        // routes/api.php
+        Route::put('sanctions/{sanction}/annuler', [SanctionController::class, 'annuler']);
         Route::post('sanctions/{sanction}/marquer-paye', [SanctionController::class, 'marquerPaye']);
         Route::apiResource('sanctions', SanctionController::class)->except(['update']);
 
-        // ── DISTRIBUTIONS ─────────────────────────────────────────────────
-        Route::get   ('distributions/{distribution}/pdf', [DistributionController::class, 'exportPdf']);
-        Route::delete('distributions/{distribution}',     [DistributionController::class, 'destroy']);
-        Route::apiResource('distributions', DistributionController::class)->except(['update', 'destroy']);
+// ── Distributions ─────────────────────────────────────────
 
+Route::get('distributions/soldes', [DistributionController::class, 'soldes']);
+Route::get('distributions', [DistributionController::class, 'index']);
+Route::post('distributions', [DistributionController::class, 'store']);
+
+// 🔥 METTRE AVANT
+Route::put('distributions/{distribution}', [DistributionController::class, 'update']);
+Route::delete('distributions/{distribution}', [DistributionController::class, 'destroy']);
+
+// 🔥 METTRE APRÈS
+Route::get('distributions/{distribution}', [DistributionController::class, 'show']);
+Route::get('distributions/{distribution}/pdf', [DistributionController::class, 'exportPdf']);
+
+        // ── COMPLÉMENTS MOTOS ─────────────────────────────────────────────
+        Route::post('complements/{complement}/approuver', [ComplementController::class, 'approuver']);
+        Route::post('complements/{complement}/refuser',   [ComplementController::class, 'refuser']);
+        Route::post('complements/{complement}/attribuer', [ComplementController::class, 'attribuerMoto']);
+        Route::get ('complements/{complement}/pdf',       [ComplementController::class, 'exportPdf']);
+        Route::apiResource('complements', ComplementController::class)->except(['update']);
+        
         // ── COMPLÉMENTS MOTOS ─────────────────────────────────────────────
         Route::post('complements/{complement}/approuver', [ComplementController::class, 'approuver']);
         Route::post('complements/{complement}/refuser',   [ComplementController::class, 'refuser']);

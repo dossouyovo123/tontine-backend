@@ -20,7 +20,7 @@ class SanctionController extends Controller
             ->when($request->statut,    fn($q, $s)  => $q->where('statut', $s))
             ->when($request->membre_id, fn($q, $id) => $q->where('membre_id', $id))
             ->orderByDesc('date_sanction')
-            ->paginate(20);
+            ->paginate(200);
 
         // Formate les dates pour Flutter
         $sanctions->getCollection()->transform(fn($s) => $this->formatSanction($s));
@@ -75,23 +75,39 @@ class SanctionController extends Controller
 
     // ── Helper ─────────────────────────────────────────────────────
 
-    private function formatSanction(Sanction $s): array
-    {
-        return [
-            'id'            => $s->id,
-            'motif'         => $s->motif,
-            'montant'       => $s->montant,
-            'statut'        => $s->statut,
-            'notes'         => $s->notes,
-            // Date dd/MM/yyyy pour Flutter
-            'date_sanction' => $s->date_sanction
-                ? Carbon::parse($s->date_sanction)->format('d/m/Y')
-                : '',
-            // Membre avec son nom même si supprimé
-            'membre' => $s->membre ? [
-                'id'  => $s->membre->id,
-                'nom' => $s->membre->nom,
-            ] : ['id' => null, 'nom' => '—'],
-        ];
+private function formatSanction(Sanction $s): array
+{
+    return [
+        'id'            => $s->id,
+        'motif'         => $s->motif,
+        'montant'       => $s->montant,
+        'statut'        => $s->statut,
+        'notes'         => $s->notes,
+        'auto_genere'   => (bool) $s->auto_genere,   // ← NOUVEAU
+        'date_sanction' => $s->date_sanction
+            ? \Carbon\Carbon::parse($s->date_sanction)->format('d/m/Y')
+            : '',
+        'membre' => $s->membre ? [
+            'id'  => $s->membre->id,
+            'nom' => $s->membre->nom,
+        ] : ['id' => null, 'nom' => '—'],
+    ];
+}
+// ── Nouvelle méthode : annuler une sanction auto ──────────────────
+// PUT /sanctions/{sanction}/annuler
+// Remet statut à 'impaye' (ne supprime pas la ligne)
+public function annuler(Sanction $sanction): JsonResponse
+{
+    if ($sanction->statut === 'en_attente') {
+        return response()->json(['message' => 'Déjà en attente.'], 422);
     }
+
+    $sanction->update([
+        'statut'        => 'en_attente',
+        'date_paiement' => null,
+    ]);
+
+    $sanction->load(['membre' => fn($q) => $q->withTrashed()]);
+    return response()->json($this->formatSanction($sanction));
+}
 }
